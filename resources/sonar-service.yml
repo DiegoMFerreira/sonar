@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: sonarqube
+  namespace: sonarqube
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9000
+    name: http
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    app: sonarqube
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: sonarqube
+  namespace: sonarqube
+  annotations:
+    konghq.com/strip-path: "false"
+    konghq.com/preserve-host: "true"
+    konghq.com/plugins: sonarqube-cors, sonarqube-security-headers
+spec:
+  ingressClassName: kong
+  rules:
+  - host: codecheck.meta.com.br
+    http:
+      paths:
+      - path: /
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: sonarqube
+            port:
+              number: 9000
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: sonarqube-cors
+  namespace: sonarqube
+config:
+  origins:
+    - "*"
+  methods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+    - OPTIONS
+  headers:
+    - Accept
+    - Accept-Version
+    - Content-Length
+    - Content-MD5
+    - Content-Type
+    - Date
+    - X-Auth-Token
+  credentials: true
+  max_age: 3600
+  preflight_continue: false
+plugin: cors
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: sonarqube-security-headers
+  namespace: sonarqube
+plugin: response-transformer
+config:
+  add:
+    headers:
+      - "Content-Security-Policy: default-src 'self';"
+      - "X-Content-Type-Options: nosniff"
+      - "X-Frame-Options: DENY"
+      - "X-XSS-Protection: 1; mode=block"
+      - "Referrer-Policy: same-origin"
+      - "Permissions-Policy: camera=(), geolocation=(), microphone=(), payment=(), usb=()"

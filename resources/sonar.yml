@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sonarqube
+  namespace: sonarqube
+  labels:
+    app: sonarqube
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sonarqube
+  template:
+    metadata:
+      labels:
+        app: sonarqube
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: sonarqube
+          image: sonarqube:community
+          securityContext:
+            runAsUser: 999
+          env:
+            - name: SONAR_JDBC_URL
+              value: "jdbc:postgresql://postgresql:5432/sonarqube"
+            - name: SONAR_JDBC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: sonarqube-secrets
+                  key: POSTGRES_USER
+            - name: SONAR_JDBC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: sonarqube-secrets
+                  key: POSTGRES_PASSWORD
+            - name: SONAR_ES_BOOTSTRAP_CHECKS_DISABLE
+              value: "true"  # Desabilita os bootstrap checks do Elasticsearch
+            - name: SONAR_ES_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"  # Ajusta a memória do Elasticsearch
+          ports:
+            - containerPort: 9000
+          volumeMounts:
+            - name: sonar-data
+              mountPath: /opt/sonarqube/data
+            - name: sonar-logs
+              mountPath: /opt/sonarqube/logs
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+      volumes:
+        - name: sonar-data
+          persistentVolumeClaim:
+            claimName: sonar-pvc
+        - name: sonar-logs
+          emptyDir: {}
